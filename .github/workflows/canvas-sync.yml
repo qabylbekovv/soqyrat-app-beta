@@ -1,0 +1,31 @@
+name: Canvas sync (public Beta)
+on:
+  schedule:
+    - cron: '2-59/5 * * * *'
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/canvas-sync.yml']
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: soqyrat-public-canvas
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verify and run the public Canvas loader
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import {createHash} from 'node:crypto';
+          import {writeFile} from 'node:fs/promises';
+          const r=await fetch('https://soqyrat-app.qabylbekovv.workers.dev/canvas-runner.mjs',{redirect:'error',signal:AbortSignal.timeout(30000)});
+          if(!r.ok)throw Error('Loader unavailable');
+          const b=Buffer.from(await r.arrayBuffer());
+          if(createHash('sha256').update(b).digest('hex')!=='0a0e333374d1fa55fc690fb0745b28491f358ab35aa5cf472e657168e83c3fc2')throw Error('Loader hash mismatch');
+          await writeFile('soqyrat-canvas-runner.mjs',b,{mode:0o600});
+          await import('./soqyrat-canvas-runner.mjs');
+          NODE
